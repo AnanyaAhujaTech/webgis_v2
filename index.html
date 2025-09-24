@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>India WebGIS - State Explorer</title>
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>India WebGIS - State Explorer</h1>
+            <p>Interactive map showcasing Indian states with detailed information</p>
+        </header>
+
+        <!-- Map Container -->
+        <div id="map" class="map-container"></div>
+
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <h3>Select States to Display</h3>
+            <div class="radio-group">
+                <label class="radio-item">
+                    <input type="radio" name="state" value="all" checked>
+                    <span class="radio-custom"></span>
+                    All India
+                </label>
+                <label class="radio-item">
+                    <input type="radio" name="state" value="madhya-pradesh">
+                    <span class="radio-custom"></span>
+                    Madhya Pradesh
+                </label>
+                <label class="radio-item">
+                    <input type="radio" name="state" value="odisha">
+                    <span class="radio-custom"></span>
+                    Odisha
+                </label>
+                <label class="radio-item">
+                    <input type="radio" name="state" value="tripura">
+                    <span class="radio-custom"></span>
+                    Tripura
+                </label>
+                <label class="radio-item">
+                    <input type="radio" name="state" value="telangana">
+                    <span class="radio-custom"></span>
+                    Telangana
+                </label>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Loading map data...</p>
+        </div>
+    </div>
+
+    <!-- State Information Modal -->
+    <div id="stateModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modalTitle">State Information</h2>
+            <div id="modalBody">
+                <p>Click on a state to view detailed information.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
