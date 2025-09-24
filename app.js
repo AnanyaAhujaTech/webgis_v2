@@ -1,181 +1,217 @@
-const MAP_START = {
-    center: [82.8, 22.0], // India center
-    zoom: 4.0,
-    minZoom: 3.5,
-    maxZoom: 11,
-    bearing: 0,
-    style: 'https://demotiles.maplibre.org/style.json',
-};
+/* js/app.js
+   Production-ready Leaflet WebGIS behavior:
+   - Loads geojson files listed in `geoFiles`
+   - Creates radio buttons, selects & zooms to state
+   - Clicking a state polygon opens modal with info
+*/
 
-const stateInfo = {
+(() => {
+  // CONFIG: list of geojson files and labels (relative paths)
+  const geoFiles = [
+    {id: 'india', file: 'india.geojson', label: 'All India'},
+    {id: 'madhya-pradesh', file: 'madhya-pradesh.geojson', label: 'Madhya Pradesh'},
+    {id: 'odisha', file: 'odisha.geojson', label: 'Odisha'},
+    {id: 'tripura', file: 'tripura.geojson', label: 'Tripura'},
+    {id: 'telangana', file: 'telangana.geojson', label: 'Telangana'}
+  ];
+
+  // Text content shown in dialog for each state (customize as needed)
+  const stateText = {
     'india': {
-        name: 'All India',
-        info: `<strong>India:</strong> The Indian Republic, a vast and diverse nation in South Asia, consisting of 28 states and 8 union territories. Click on a state to view more information.`
+      title: 'India (All States)',
+      body: 'This view contains all state boundaries from the provided India GeoJSON. Use the radios to zoom to a specific state, or click a state polygon on the map.'
     },
     'madhya-pradesh': {
-        name: 'Madhya Pradesh',
-        info: `<strong>Madhya Pradesh:</strong> The "Heart of India", known for its rich history, wildlife parks, and cultural heritage.`
+      title: 'Madhya Pradesh',
+      body: 'Madhya Pradesh — central Indian state. (Replace this text with whatever state-specific info you want shown.)'
     },
     'odisha': {
-        name: 'Odisha',
-        info: `<strong>Odisha:</strong> Eastern coastal state famous for the Jagannath Temple, Puri beaches, and classical dance Odissi.`
+      title: 'Odisha',
+      body: 'Odisha — eastern Indian state on the Bay of Bengal. (Replace with custom content.)'
     },
     'tripura': {
-        name: 'Tripura',
-        info: `<strong>Tripura:</strong> Northeastern state bordered by Bangladesh, known for its palaces, tribal culture, and lush hills.`
+      title: 'Tripura',
+      body: 'Tripura — a small northeastern state. (Replace with custom content.)'
     },
     'telangana': {
-        name: 'Telangana',
-        info: `<strong>Telangana:</strong> Southern state with growing tech industries, Hyderabad, and remarkable architectural sites.`
+      title: 'Telangana',
+      body: 'Telangana — state in southern India with capital Hyderabad. (Replace with custom content.)'
     }
-};
+  };
 
-const stateLayers = [
-    {key: 'madhya-pradesh',   file: 'madhya-pradesh.geojson',  color: '#c53b3b'},
-    {key: 'odisha',           file: 'odisha.geojson',          color: '#2157a2'},
-    {key: 'tripura',          file: 'tripura.geojson',         color: '#1eaa64'},
-    {key: 'telangana',        file: 'telangana.geojson',       color: '#a167c9'},
-];
+  // color palette for states
+  const colors = ['#1f78b4','#33a02c','#e31a1c','#ff7f00','#6a3d9a'];
 
-const baseLayer = {key: 'india', file: 'india.geojson', color: '#e1e1e1'};
+  // Leaflet map
+  const map = L.map('map', {
+    center: [22.0, 80.0],
+    zoom: 5,
+    preferCanvas: true
+  });
 
-let map;
-let loadedLayers = {};
+  // Add OSM base tiles
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
 
-function showLoading(show) {
-    document.getElementById('loading').style.display = show ? 'block' : 'none';
-}
+  // hold loaded layers
+  const layers = {};
+  const layerGroup = L.layerGroup().addTo(map);
 
-function initMap() {
-    map = new maplibregl.Map({
-        container: 'map',
-        style: MAP_START.style,
-        center: MAP_START.center,
-        zoom: MAP_START.zoom,
-        minZoom: MAP_START.minZoom,
-        maxZoom: MAP_START.maxZoom,
-        bearing: MAP_START.bearing,
-        attributionControl: true,
-    });
-    map.addControl(new maplibregl.NavigationControl(), 'top-right');
-    showLoading(true);
-    map.on('load', () => {
-        loadLayer(baseLayer, true, true, true, 'india');
-        // By default, load all states for All India
-        stateLayers.forEach(layer => loadLayer(layer, true, false, false, layer.key));
-        showLoading(false);
-    });
-}
+  // helper: open modal
+  const modal = document.getElementById('modal');
+  const modalTitle = document.getElementById('modal-title');
+  const modalBody = document.getElementById('modal-body');
+  const modalCloseBtn = document.getElementById('modal-close');
 
-// Helper: Load GeoJSON Layer
-function loadLayer(layer, show, fitBounds, hoverHighlight, stateKey) {
-    fetch(layer.file)
-        .then(response => response.json())
-        .then(geojson => {
-            if(map.getSource(layer.key)) {
-                if(map.getLayer(`${layer.key}-fill`)) map.removeLayer(`${layer.key}-fill`);
-                if(map.getLayer(`${layer.key}-outline`)) map.removeLayer(`${layer.key}-outline`);
-                map.removeSource(layer.key);
-            }
-            map.addSource(layer.key, {type: 'geojson', data: geojson});
-            map.addLayer({
-                id: `${layer.key}-fill`,
-                type: 'fill',
-                source: layer.key,
-                paint: {
-                    'fill-color': layer.color,
-                    'fill-opacity': 0.22,
-                },
-                layout: {visibility: show ? 'visible' : 'none'}
-            });
-            map.addLayer({
-                id: `${layer.key}-outline`,
-                type: 'line',
-                source: layer.key,
-                paint: {
-                    'line-color': layer.color,
-                    'line-width': 2
-                },
-                layout: {visibility: show ? 'visible' : 'none'}
-            });
-            map.on('click', `${layer.key}-fill`, (e) => {
-                openModal(stateKey, geojson, e);
-            });
-            map.on('mouseenter', `${layer.key}-fill`, () => {
-                map.getCanvas().style.cursor = 'pointer';
-            });
-            map.on('mouseleave', `${layer.key}-fill`, () => {
-                map.getCanvas().style.cursor = '';
-            });
-            if(fitBounds) {
-                const bbox = turf.bbox(geojson);
-                map.fitBounds(bbox, {padding: 30, duration: 800});
-            }
-            loadedLayers[layer.key] = true;
-        })
-        .catch(err => {
-            console.error('Error loading', layer.file, err);
-        });
-}
-
-function updateLayers(selectedKey) {
-    if(selectedKey === 'all') {
-        loadLayer(baseLayer, true, true, false, 'india');
-        stateLayers.forEach(layer => {
-            loadLayer(layer, true, false, false, layer.key);
-        });
+  function openModal(title, body) {
+    modalTitle.textContent = title;
+    if (typeof body === 'string') {
+      modalBody.textContent = body;
     } else {
-        loadLayer(baseLayer, true, false, false, 'india');
-        stateLayers.forEach(layer => {
-            if(layer.key === selectedKey){
-                loadLayer(layer, true, true, false, layer.key);
-            } else {
-                if(map.getLayer(`${layer.key}-fill`)){
-                    map.setLayoutProperty(`${layer.key}-fill`, 'visibility', 'none');
-                }
-                if(map.getLayer(`${layer.key}-outline`)){
-                    map.setLayoutProperty(`${layer.key}-outline`, 'visibility', 'none');
-                }
-            }
-        });
+      modalBody.innerHTML = '';
+      modalBody.appendChild(body);
     }
-}
+    modal.setAttribute('aria-hidden', 'false');
+    modal.focus && modal.focus();
+  }
+  function closeModal() {
+    modal.setAttribute('aria-hidden', 'true');
+  }
+  modalCloseBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', (ev) => {
+    if (ev.target === modal) closeModal();
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') closeModal();
+  });
 
-function openModal(stateKey, geojson, event) {
-    let title = stateInfo[stateKey]?.name || "State Information";
-    let body = stateInfo[stateKey]?.info || "No information available.";
-    if(event && event.features && event.features.length && event.features[0].properties) {
-        let extras = '';
-        const props = event.features[0].properties;
-        for(let k in props) {
-            extras += `<strong>${k}</strong>: ${props[k]}<br>`;
+  // Create radio buttons UI
+  const controls = document.getElementById('controls');
+  const stateGroup = document.createElement('div');
+  stateGroup.className = 'state-group';
+  controls.appendChild(stateGroup);
+
+  // We'll create radios as we load the files so selection works only when layer is ready
+  // Fetch and load all geojsons
+  Promise.all(geoFiles.map((g, idx) =>
+    fetch(g.file)
+      .then(resp => {
+        if (!resp.ok) throw new Error(`Failed to load ${g.file} (${resp.status})`);
+        return resp.json();
+      })
+      .then(json => ({...g, geojson: json, idx}))
+      .catch(err => ({...g, error: err}))
+  )).then(results => {
+    // Add radios, add layers that loaded
+    results.forEach((res, i) => {
+      const id = res.id;
+      const label = res.label;
+
+      // Radio element
+      const radioId = `radio-${id}`;
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'state';
+      radio.id = radioId;
+      radio.value = id;
+      radio.className = 'state-radio';
+      radio.disabled = !!res.error;
+
+      const lab = document.createElement('label');
+      lab.setAttribute('for', radioId);
+      lab.textContent = label;
+
+      stateGroup.appendChild(radio);
+      stateGroup.appendChild(lab);
+
+      if (res.error) {
+        lab.title = `Could not load ${res.file}: ${res.error.message}`;
+        lab.style.opacity = 0.6;
+        return;
+      }
+
+      // Create styled geojson layer
+      const style = featureStyle(i);
+      const gjLayer = L.geoJSON(res.geojson, {
+        style,
+        onEachFeature: function(feature, layer) {
+          layer.on('click', function(e){
+            // show custom dialog for this state (id)
+            const title = (stateText[id] && stateText[id].title) || label;
+            const body = (stateText[id] && stateText[id].body) || 'No description available.';
+            openModal(title, body);
+            // highlight on click briefly
+            highlightLayer(layer);
+          });
+          // optional tooltip if feature has properties.name
+          if (feature.properties && feature.properties.name) {
+            layer.bindTooltip(feature.properties.name, {sticky:true});
+          }
         }
-        body += `<br><br><u>GeoJSON Properties:</u><br>` + extras;
-    }
-    document.getElementById('modalTitle').innerHTML = title;
-    document.getElementById('modalBody').innerHTML = body;
-    document.getElementById('stateModal').style.display = 'block';
-}
+      });
 
-function closeModal() {
-    document.getElementById('stateModal').style.display = 'none';
-}
+      layers[id] = gjLayer;
+      // by default add the India layer (if id === 'india') otherwise keep but not added
+      if (id === 'india') {
+        layerGroup.addLayer(gjLayer);
+        map.fitBounds(gjLayer.getBounds(), {padding: [20,20]});
+        // mark its radio as checked
+        const initialRadio = document.getElementById(radioId);
+        if (initialRadio) initialRadio.checked = true;
+      }
 
-window.onload = function() {
-    initMap();
-    document.querySelectorAll('input[type=radio][name=state]').forEach(radio => {
-        radio.addEventListener('change', function(e) {
-            updateLayers(e.target.value);
-        });
+      // radio click behavior
+      radio.addEventListener('change', function() {
+        if (!this.checked) return;
+        // remove previous
+        layerGroup.clearLayers();
+        if (layers[id]) {
+          layerGroup.addLayer(layers[id]);
+          const b = layers[id].getBounds();
+          if (b && b.isValid()) map.fitBounds(b, {padding: [20,20]});
+        }
+        // open modal for this selection
+        const title = (stateText[id] && stateText[id].title) || label;
+        const body = (stateText[id] && stateText[id].body) || '';
+        openModal(title, body);
+      });
     });
-    document.getElementsByClassName('close')[0].onclick = closeModal;
-    window.onclick = function(event) {
-        let modal = document.getElementById('stateModal');
-        if (event.target === modal) closeModal();
-    };
-};
 
-// Turf.js for bbox calculation
-var script = document.createElement('script');
-script.src = 'https://cdn.jsdelivr.net/npm/@turf/turf/turf.min.js';
-document.head.appendChild(script);
+    // Add a small instruction label
+    const info = document.createElement('div');
+    info.style.fontSize = '0.9rem';
+    info.style.marginLeft = '8px';
+    info.style.color = '#444';
+    info.textContent = 'Choose a state or click one on the map';
+    controls.appendChild(info);
+  }).catch(err => {
+    console.error('Fatal load error', err);
+    openModal('Load error', 'Could not load geojson files. Check that the files exist and are served from the same directory as the site.');
+  });
+
+  // style factory
+  function featureStyle(index){
+    const c = colors[index % colors.length] || colors[0];
+    return {
+      color: c,
+      weight: 1.8,
+      opacity: 0.95,
+      fillOpacity: 0.4
+    };
+  }
+
+  // highlight briefly
+  function highlightLayer(layer) {
+    const orig = layer.options && {...layer.options};
+    layer.setStyle({
+      weight: 3,
+      fillOpacity: 0.6
+    });
+    setTimeout(() => {
+      layer.setStyle(orig);
+    }, 800);
+  }
+
+})();
